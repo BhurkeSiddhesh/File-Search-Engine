@@ -11,10 +11,13 @@ import pickle
 import PySimpleGUI as sg
 from typing import Dict
 
-# The older API used `ChangeLookAndFeel` which is no longer available in
-# current versions of PySimpleGUI. Use the supported `change_look_and_feel`
-# call instead so that the program works with modern releases.
-sg.change_look_and_feel('Black')
+# Support both old and new PySimpleGUI theme APIs so that the tests, which
+# monkeypatch ``ChangeLookAndFeel``, work regardless of the installed
+# version. Prefer the modern call when available.
+if hasattr(sg, 'change_look_and_feel'):
+    sg.change_look_and_feel('Black')
+elif hasattr(sg, 'ChangeLookAndFeel'):
+    sg.ChangeLookAndFeel('Black')
 
 class Gui:
     ''' Create a GUI object '''
@@ -46,13 +49,53 @@ class SearchEngine:
         self.records = 0 # count of records searched
 
 
-    def create_new_index(self, values: Dict[str, str]) -> None:
-        ''' Create a new file index of the root; then save to self.file_index and to pickle file '''
+    def create_new_index(self, values: Dict[str, str], show_cli_progress: bool = False) -> None:
+        '''Create a new file index of the root path with progress information.
+
+        A progress meter is displayed using PySimpleGUI while directories are
+        traversed. When ``show_cli_progress`` is ``True`` a simple text based
+        progress indicator is also printed to the console. The resulting index
+        is stored on ``self.file_index`` and written to ``file_index.pkl``.
+        '''
         root_path = values['PATH']
-        self.file_index: list = [(root, files) for root, dirs, files in os.walk(root_path) if files]
+
+        # Determine the total number of directories so the progress meter can
+        # report the correct percentage completed.
+        total_dirs = sum(1 for _ in os.walk(root_path)) or 1
+
+        self.file_index = []
+        current_dir = 0
+        for root, _, files in os.walk(root_path):
+            current_dir += 1
+            # update the GUI progress meter
+            sg.one_line_progress_meter(
+                'Indexing Files',
+                current_dir,
+                total_dirs,
+                'INDEX_PROGRESS',
+                'Scanning directories...',
+            )
+
+            # optional CLI progress for non-GUI callers
+            if show_cli_progress:
+                percent = int(current_dir / total_dirs * 100)
+                print(f'Indexing: {percent:3d}% ({current_dir}/{total_dirs})', end='\r')
+
+            if files:
+                self.file_index.append((root, files))
+
+        # ensure the progress meter is closed and the CLI progress line is reset
+        sg.one_line_progress_meter(
+            'Indexing Files',
+            total_dirs,
+            total_dirs,
+            'INDEX_PROGRESS',
+        )
+        if show_cli_progress:
+            print()
 
         # save index to file
-        with open('file_index.pkl','wb') as f:
+        with open('file_index.pkl', 'wb') as f:
             pickle.dump(self.file_index, f)
 
 
