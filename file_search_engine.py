@@ -10,7 +10,11 @@ import os
 import pickle
 import PySimpleGUI as sg
 from typing import Dict
-sg.ChangeLookAndFeel('Black')
+
+# The older API used `ChangeLookAndFeel` which is no longer available in
+# current versions of PySimpleGUI. Use the supported `change_look_and_feel`
+# call instead so that the program works with modern releases.
+sg.change_look_and_feel('Black')
 
 class Gui:
     ''' Create a GUI object '''
