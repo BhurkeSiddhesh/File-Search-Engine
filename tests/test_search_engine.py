@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 mock_sg = types.ModuleType('PySimpleGUI')
-mock_sg.ChangeLookAndFeel = lambda *args, **kwargs: None
+mock_sg.change_look_and_feel = lambda *args, **kwargs: None
 sys.modules['PySimpleGUI'] = mock_sg
 from file_search_engine import SearchEngine
 
@@ -68,3 +68,27 @@ def test_search_endswith(search_engine):
     assert engine.results == expected
     assert engine.matches == 1
     assert engine.records == 4
+
+
+class DummyProgress:
+    def __init__(self):
+        self.calls = []
+
+    def UpdateBar(self, current, total=None):
+        self.calls.append((current, total))
+
+
+def test_create_new_index_progress(tmp_path):
+    dirs = [tmp_path / 'a', tmp_path / 'b']
+    for d in dirs:
+        d.mkdir()
+        (d / 'file.txt').write_text('x')
+
+    engine = SearchEngine()
+    engine.progress = DummyProgress()
+    values = {'PATH': str(tmp_path)}
+    engine.create_new_index(values)
+
+    assert len(engine.progress.calls) == 3
+    assert engine.progress.calls[0] == (0, 2)
+    assert engine.progress.calls[-1] == (2, 2)
