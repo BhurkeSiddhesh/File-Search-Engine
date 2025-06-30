@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT))
 
 mock_sg = types.ModuleType('PySimpleGUI')
 mock_sg.ChangeLookAndFeel = lambda *args, **kwargs: None
+mock_sg.change_look_and_feel = lambda *args, **kwargs: None
 sys.modules['PySimpleGUI'] = mock_sg
 from file_search_engine import SearchEngine
 
@@ -65,6 +66,25 @@ def test_search_endswith(search_engine):
     values = {"TERM": ".py", "CONTAINS": False, "STARTSWITH": False, "ENDSWITH": True}
     engine.search(values)
     expected = [f"{tmp}/dir2/gamma.py"]
+    assert engine.results == expected
+    assert engine.matches == 1
+    assert engine.records == 4
+
+
+def test_case_sensitive_no_match(search_engine):
+    engine, tmp = search_engine
+    values = {"TERM": "Alpha.txt", "CONTAINS": True, "STARTSWITH": False, "ENDSWITH": False, "CASE": True}
+    engine.search(values)
+    assert engine.results == []
+    assert engine.matches == 0
+    assert engine.records == 4
+
+
+def test_case_insensitive_match(search_engine):
+    engine, tmp = search_engine
+    values = {"TERM": "Alpha.txt", "CONTAINS": True, "STARTSWITH": False, "ENDSWITH": False, "CASE": False}
+    engine.search(values)
+    expected = [f"{tmp}/dir1/alpha.txt"]
     assert engine.results == expected
     assert engine.matches == 1
     assert engine.records == 4
