@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT))
 
 mock_sg = types.ModuleType('PySimpleGUI')
 mock_sg.ChangeLookAndFeel = lambda *args, **kwargs: None
+mock_sg.change_look_and_feel = lambda *args, **kwargs: None
 sys.modules['PySimpleGUI'] = mock_sg
 from file_search_engine import SearchEngine
 
@@ -68,3 +69,22 @@ def test_search_endswith(search_engine):
     assert engine.results == expected
     assert engine.matches == 1
     assert engine.records == 4
+
+def test_extension_filter(search_engine):
+    engine, tmp = search_engine
+    values = {
+        "TERM": "",
+        "CONTAINS": True,
+        "STARTSWITH": False,
+        "ENDSWITH": False,
+        "EXT": ".txt",
+    }
+    engine.search(values)
+    expected = sorted([
+        f"{tmp}/dir1/alpha.txt",
+        f"{tmp}/dir1/alphabet.txt",
+        f"{tmp}/dir2/beta.txt",
+    ])
+    assert sorted(engine.results) == expected
+    assert engine.matches == 3
+    assert engine.records == 3
