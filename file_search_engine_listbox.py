@@ -4,8 +4,8 @@
     Email:      israel.dryer@gmail.com
     Modified:   2020-08-25
 
-    A very simplified version of the file search engine project built with PySimpleGUI
-    except using a listbox. When an item is click on, the program will attempt to open with the
+    A very simplified version of the file search engine project built with PySimpleGUI except
+    using a listbox. When an item is clicked on, the program will attempt to open with the
     default program.
 """
 
