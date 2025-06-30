@@ -21,15 +21,17 @@ class Gui:
     
     def __init__(self):
         self.layout: list = [
-            [sg.Text('Search Term', size=(11,1)), 
-             sg.Input(size=(40,1), focus=True, key="TERM"), 
-             sg.Radio('Contains', size=(10,1), group_id='choice', key="CONTAINS", default=True), 
-             sg.Radio('StartsWith', size=(10,1), group_id='choice', key="STARTSWITH"), 
+            [sg.Text('Search Term', size=(11,1)),
+             sg.Input(size=(40,1), focus=True, key="TERM"),
+             sg.Radio('Contains', size=(10,1), group_id='choice', key="CONTAINS", default=True),
+             sg.Radio('StartsWith', size=(10,1), group_id='choice', key="STARTSWITH"),
              sg.Radio('EndsWith', size=(10,1), group_id='choice', key="ENDSWITH")],
-            [sg.Text('Root Path', size=(11,1)), 
-             sg.Input('/..', size=(40,1), key="PATH"), 
-             sg.FolderBrowse('Browse', size=(10,1)), 
-             sg.Button('Re-Index', size=(10,1), key="_INDEX_"), 
+            [sg.Text('Extension Filter', size=(11,1)),
+             sg.Input(size=(40,1), key="EXT")],
+            [sg.Text('Root Path', size=(11,1)),
+             sg.Input('/..', size=(40,1), key="PATH"),
+             sg.FolderBrowse('Browse', size=(10,1)),
+             sg.Button('Re-Index', size=(10,1), key="_INDEX_"),
              sg.Button('Search', size=(10,1), bind_return_key=True, key="_SEARCH_")],
             [sg.Output(size=(100,30))]]
         
@@ -72,13 +74,16 @@ class SearchEngine:
         self.matches = 0
         self.records = 0
         term = values['TERM']
+        ext_filter = values.get('EXT', '').strip().lower()
 
         # search for matches and count results
         for path, files in self.file_index:
             for file in files:
+                if ext_filter and not file.lower().endswith(ext_filter):
+                    continue
                 self.records +=1
-                if (values['CONTAINS'] and term.lower() in file.lower() or 
-                    values['STARTSWITH'] and file.lower().startswith(term.lower()) or 
+                if (values['CONTAINS'] and term.lower() in file.lower() or
+                    values['STARTSWITH'] and file.lower().startswith(term.lower()) or
                     values['ENDSWITH'] and file.lower().endswith(term.lower())):
 
                     result = path.replace('\\','/') + '/' + file
