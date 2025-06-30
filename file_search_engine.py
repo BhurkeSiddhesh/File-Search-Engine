@@ -21,11 +21,12 @@ class Gui:
     
     def __init__(self):
         self.layout: list = [
-            [sg.Text('Search Term', size=(11,1)), 
-             sg.Input(size=(40,1), focus=True, key="TERM"), 
-             sg.Radio('Contains', size=(10,1), group_id='choice', key="CONTAINS", default=True), 
-             sg.Radio('StartsWith', size=(10,1), group_id='choice', key="STARTSWITH"), 
-             sg.Radio('EndsWith', size=(10,1), group_id='choice', key="ENDSWITH")],
+            [sg.Text('Search Term', size=(11,1)),
+             sg.Input(size=(40,1), focus=True, key="TERM"),
+             sg.Radio('Contains', size=(10,1), group_id='choice', key="CONTAINS", default=True),
+             sg.Radio('StartsWith', size=(10,1), group_id='choice', key="STARTSWITH"),
+             sg.Radio('EndsWith', size=(10,1), group_id='choice', key="ENDSWITH"),
+             sg.Radio('Content', size=(10,1), group_id='choice', key="CONTENT")],
             [sg.Text('Root Path', size=(11,1)), 
              sg.Input('/..', size=(40,1), key="PATH"), 
              sg.FolderBrowse('Browse', size=(10,1)), 
@@ -67,26 +68,41 @@ class SearchEngine:
 
     def search(self, values: Dict[str, str]) -> None:
         ''' Search for the term based on the type in the index; the types of search
-            include: contains, startswith, endswith; save the results to file '''
+            include: contains, startswith, endswith, content; save the results to file '''
         self.results.clear()
         self.matches = 0
         self.records = 0
         term = values['TERM']
+        case_sensitive = values.get('CASE', False)
 
         # search for matches and count results
         for path, files in self.file_index:
             for file in files:
                 self.records +=1
-                if (values['CONTAINS'] and term.lower() in file.lower() or 
-                    values['STARTSWITH'] and file.lower().startswith(term.lower()) or 
-                    values['ENDSWITH'] and file.lower().endswith(term.lower())):
+                match = False
+                if values.get('CONTENT'):
+                    try:
+                        with open(os.path.join(path, file), 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()
+                            if case_sensitive:
+                                match = term in content
+                            else:
+                                match = term.lower() in content.lower()
+                    except Exception:
+                        match = False
+                else:
+                    file_name = file if case_sensitive else file.lower()
+                    check_term = term if case_sensitive else term.lower()
+                    if (values.get('CONTAINS') and check_term in file_name or
+                        values.get('STARTSWITH') and file_name.startswith(check_term) or
+                        values.get('ENDSWITH') and file_name.endswith(check_term)):
+                        match = True
 
+                if match:
                     result = path.replace('\\','/') + '/' + file
                     self.results.append(result)
                     self.matches +=1
-                else:
-                    continue 
-        
+
         # save results to file
         with open('search_results.txt','w') as f:
             for row in self.results:

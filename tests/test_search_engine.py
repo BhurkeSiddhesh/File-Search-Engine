@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT))
 
 mock_sg = types.ModuleType('PySimpleGUI')
 mock_sg.ChangeLookAndFeel = lambda *args, **kwargs: None
+mock_sg.change_look_and_feel = lambda *args, **kwargs: None
 sys.modules['PySimpleGUI'] = mock_sg
 from file_search_engine import SearchEngine
 
@@ -67,4 +68,20 @@ def test_search_endswith(search_engine):
     expected = [f"{tmp}/dir2/gamma.py"]
     assert engine.results == expected
     assert engine.matches == 1
+    assert engine.records == 4
+
+
+def test_search_content(search_engine):
+    engine, tmp = search_engine
+    # add search term to a couple of files
+    (tmp / "dir1" / "alpha.txt").write_text("needle inside")
+    (tmp / "dir2" / "gamma.py").write_text("here is a Needle")
+    values = {"TERM": "needle", "CONTAINS": False, "STARTSWITH": False, "ENDSWITH": False, "CONTENT": True}
+    engine.search(values)
+    expected = sorted([
+        f"{tmp}/dir1/alpha.txt",
+        f"{tmp}/dir2/gamma.py",
+    ])
+    assert sorted(engine.results) == expected
+    assert engine.matches == 2
     assert engine.records == 4
