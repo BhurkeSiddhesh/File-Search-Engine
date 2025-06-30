@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT))
 
 mock_sg = types.ModuleType('PySimpleGUI')
 mock_sg.ChangeLookAndFeel = lambda *args, **kwargs: None
+mock_sg.change_look_and_feel = lambda *args, **kwargs: None
 sys.modules['PySimpleGUI'] = mock_sg
 from file_search_engine import SearchEngine
 

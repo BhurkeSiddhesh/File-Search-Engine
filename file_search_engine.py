@@ -21,19 +21,20 @@ class Gui:
     
     def __init__(self):
         self.layout: list = [
-            [sg.Text('Search Term', size=(11,1)), 
-             sg.Input(size=(40,1), focus=True, key="TERM"), 
-             sg.Radio('Contains', size=(10,1), group_id='choice', key="CONTAINS", default=True), 
-             sg.Radio('StartsWith', size=(10,1), group_id='choice', key="STARTSWITH"), 
+            [sg.Text('Search Term', size=(11,1)),
+             sg.Input(size=(40,1), focus=True, key="TERM"),
+             sg.Radio('Contains', size=(10,1), group_id='choice', key="CONTAINS", default=True),
+             sg.Radio('StartsWith', size=(10,1), group_id='choice', key="STARTSWITH"),
              sg.Radio('EndsWith', size=(10,1), group_id='choice', key="ENDSWITH")],
-            [sg.Text('Root Path', size=(11,1)), 
-             sg.Input('/..', size=(40,1), key="PATH"), 
-             sg.FolderBrowse('Browse', size=(10,1)), 
-             sg.Button('Re-Index', size=(10,1), key="_INDEX_"), 
+            [sg.Text('Root Path', size=(11,1)),
+             sg.Input('/..', size=(40,1), key="PATH"),
+             sg.FolderBrowse('Browse', size=(10,1)),
+             sg.Button('Re-Index', size=(10,1), key="_INDEX_"),
              sg.Button('Search', size=(10,1), bind_return_key=True, key="_SEARCH_")],
-            [sg.Output(size=(100,30))]]
-        
-        self.window: object = sg.Window('File Search Engine', self.layout, element_justification='left')
+            [sg.Listbox(values=[], size=(100,30), key="_RESULTS_", enable_events=True)]]
+
+        self.window: object = sg.Window('File Search Engine', self.layout, element_justification='left', finalize=True)
+        self.window['_RESULTS_'].expand(expand_x=True, expand_y=True)
 
 
 class SearchEngine:
@@ -92,6 +93,11 @@ class SearchEngine:
             for row in self.results:
                 f.write(row + '\n')
 
+
+def open_file(file_name: str) -> None:
+    """Attempt to open the file with the default program"""
+    os.system(file_name)
+
 def main():
     ''' The main loop for the program '''
     g = Gui()
@@ -110,15 +116,15 @@ def main():
             print()
         if event == '_SEARCH_':
             s.search(values)
+            g.window['_RESULTS_'].update(values=s.results)
 
-            # print the results to output element
-            print()
-            for result in s.results:
-                print(result)
-            
             print()
             print(">> Searched {:,d} records and found {:,d} matches".format(s.records, s.matches))
             print(">> Results saved in working directory as search_results.txt.")
+        if event == '_RESULTS_':
+            result_list = values.get('_RESULTS_', [])
+            if result_list:
+                open_file(result_list[0])
 
 
 if __name__ == '__main__':
