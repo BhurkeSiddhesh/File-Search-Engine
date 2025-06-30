@@ -1,5 +1,5 @@
 # File-Search-Engine
-A simple GUI based utility to index and search local files. So... perhaps the GUI is a bit unnecessary, but why not. 
+A simple GUI based utility to index and search local files. So... perhaps the GUI is a bit unnecessary, but why not.
 
 Features:
 - Search options include: 'contains', 'startswith', and 'endswith'
