@@ -20,19 +20,21 @@ class Gui:
     ''' Create a GUI object '''
     
     def __init__(self):
+        self.progress = sg.ProgressBar(max_value=1, orientation='h', size=(40, 20), key='PROGRESS')
         self.layout: list = [
-            [sg.Text('Search Term', size=(11,1)), 
-             sg.Input(size=(40,1), focus=True, key="TERM"), 
-             sg.Radio('Contains', size=(10,1), group_id='choice', key="CONTAINS", default=True), 
-             sg.Radio('StartsWith', size=(10,1), group_id='choice', key="STARTSWITH"), 
+            [sg.Text('Search Term', size=(11,1)),
+             sg.Input(size=(40,1), focus=True, key="TERM"),
+             sg.Radio('Contains', size=(10,1), group_id='choice', key="CONTAINS", default=True),
+             sg.Radio('StartsWith', size=(10,1), group_id='choice', key="STARTSWITH"),
              sg.Radio('EndsWith', size=(10,1), group_id='choice', key="ENDSWITH")],
-            [sg.Text('Root Path', size=(11,1)), 
-             sg.Input('/..', size=(40,1), key="PATH"), 
-             sg.FolderBrowse('Browse', size=(10,1)), 
-             sg.Button('Re-Index', size=(10,1), key="_INDEX_"), 
+            [sg.Text('Root Path', size=(11,1)),
+             sg.Input('/..', size=(40,1), key="PATH"),
+             sg.FolderBrowse('Browse', size=(10,1)),
+             sg.Button('Re-Index', size=(10,1), key="_INDEX_"),
              sg.Button('Search', size=(10,1), bind_return_key=True, key="_SEARCH_")],
-            [sg.Output(size=(100,30))]]
-        
+            [sg.Output(size=(100,30))],
+            [self.progress]]
+
         self.window: object = sg.Window('File Search Engine', self.layout, element_justification='left')
 
 
@@ -44,12 +46,21 @@ class SearchEngine:
         self.results = [] # search results returned from search method
         self.matches = 0 # count of records matched
         self.records = 0 # count of records searched
+        self.progress = None
 
 
     def create_new_index(self, values: Dict[str, str]) -> None:
         ''' Create a new file index of the root; then save to self.file_index and to pickle file '''
         root_path = values['PATH']
-        self.file_index: list = [(root, files) for root, dirs, files in os.walk(root_path) if files]
+        dir_listing = [(root, files) for root, dirs, files in os.walk(root_path) if files]
+        total_dirs = len(dir_listing)
+        self.file_index = []
+        if self.progress is not None:
+            self.progress.UpdateBar(0, total_dirs)
+        for count, (root, files) in enumerate(dir_listing, start=1):
+            self.file_index.append((root, files))
+            if self.progress is not None:
+                self.progress.UpdateBar(count, total_dirs)
 
         # save index to file
         with open('file_index.pkl','wb') as f:
@@ -96,6 +107,7 @@ def main():
     ''' The main loop for the program '''
     g = Gui()
     s = SearchEngine()
+    s.progress = g.progress
     s.load_existing_index() # load if exists, otherwise return empty list
 
     while True:
