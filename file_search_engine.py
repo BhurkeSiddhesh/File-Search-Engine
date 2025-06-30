@@ -21,11 +21,12 @@ class Gui:
     
     def __init__(self):
         self.layout: list = [
-            [sg.Text('Search Term', size=(11,1)), 
-             sg.Input(size=(40,1), focus=True, key="TERM"), 
-             sg.Radio('Contains', size=(10,1), group_id='choice', key="CONTAINS", default=True), 
-             sg.Radio('StartsWith', size=(10,1), group_id='choice', key="STARTSWITH"), 
-             sg.Radio('EndsWith', size=(10,1), group_id='choice', key="ENDSWITH")],
+            [sg.Text('Search Term', size=(11,1)),
+             sg.Input(size=(40,1), focus=True, key="TERM"),
+             sg.Radio('Contains', size=(10,1), group_id='choice', key="CONTAINS", default=True),
+             sg.Radio('StartsWith', size=(10,1), group_id='choice', key="STARTSWITH"),
+             sg.Radio('EndsWith', size=(10,1), group_id='choice', key="ENDSWITH"),
+             sg.Checkbox('Case', key='CASE', default=False)],
             [sg.Text('Root Path', size=(11,1)), 
              sg.Input('/..', size=(40,1), key="PATH"), 
              sg.FolderBrowse('Browse', size=(10,1)), 
@@ -72,14 +73,17 @@ class SearchEngine:
         self.matches = 0
         self.records = 0
         term = values['TERM']
+        case_sensitive = values.get('CASE', False)
+        term_cmp = term if case_sensitive else term.lower()
 
         # search for matches and count results
         for path, files in self.file_index:
             for file in files:
                 self.records +=1
-                if (values['CONTAINS'] and term.lower() in file.lower() or 
-                    values['STARTSWITH'] and file.lower().startswith(term.lower()) or 
-                    values['ENDSWITH'] and file.lower().endswith(term.lower())):
+                file_cmp = file if case_sensitive else file.lower()
+                if (values['CONTAINS'] and term_cmp in file_cmp or
+                    values['STARTSWITH'] and file_cmp.startswith(term_cmp) or
+                    values['ENDSWITH'] and file_cmp.endswith(term_cmp)):
 
                     result = path.replace('\\','/') + '/' + file
                     self.results.append(result)
