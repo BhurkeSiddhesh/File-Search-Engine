@@ -1,0 +1,13 @@
+PySimpleGUI
+python-docx
+pypdf
+python-pptx
+openpyxl
+openai
+langchain
+llama-cpp-python
+faiss-cpu
+tiktoken
+watchdog
+langchain-text-splitters
+langchain-community
