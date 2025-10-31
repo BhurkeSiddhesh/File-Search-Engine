@@ -16,11 +16,11 @@ def extract_text(filepath):
                 return f.read()
         elif ext == '.docx':
             doc = Document(filepath)
-            return "\\n".join([para.text for para in doc.paragraphs])
+            return "\n".join([para.text for para in doc.paragraphs])
         elif ext == '.pdf':
             with open(filepath, 'rb') as f:
                 reader = PdfReader(f)
-                return "\\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
+                return "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
         elif ext == '.pptx':
             prs = Presentation(filepath)
             text = []
@@ -28,7 +28,7 @@ def extract_text(filepath):
                 for shape in slide.shapes:
                     if hasattr(shape, "text"):
                         text.append(shape.text)
-            return "\\n".join(text)
+            return "\n".join(text)
         elif ext == '.xlsx':
             workbook = load_workbook(filepath, read_only=True)
             text = []
@@ -37,7 +37,7 @@ def extract_text(filepath):
                     for cell in row:
                         if cell.value:
                             text.append(str(cell.value))
-            return "\\n".join(text)
+            return "\n".join(text)
         else:
             print(f"Unsupported file type: {ext}")
             return None
