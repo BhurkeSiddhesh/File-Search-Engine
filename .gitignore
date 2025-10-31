@@ -1,2 +1,8 @@
+__pycache__/
+jules-scratch/
+.idea/
 *.pkl
-*.txt
+index.faiss
+config.ini
+search_results.txt
+file_index.pkl
