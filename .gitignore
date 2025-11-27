@@ -1,8 +1,38 @@
+```
+# Compiled Python files
+*.pyc
 __pycache__/
-jules-scratch/
-.idea/
+
+# Pickle files (often generated/temporary)
 *.pkl
-index.faiss
-config.ini
-search_results.txt
-file_index.pkl
+
+# Test artifacts
+.pytest_cache/
+.coverage
+coverage/
+htmlcov/
+
+# Dependencies
+.venv/
+venv/
+env/
+node_modules/
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Environment files
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+```

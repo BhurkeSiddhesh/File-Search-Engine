@@ -29,7 +29,14 @@ def create_index(folder_path, provider, api_key=None, model_path=None):
 
     embeddings = np.array(embeddings_model.embed_documents(docs)).astype('float32')
 
-    tags = get_tags("\n".join(docs), provider, api_key, model_path).split(',')
+    # Generate tags for each document separately
+    tags = []
+    for doc in docs:
+        doc_tags = get_tags(doc, provider, api_key, model_path)
+        # Split the tags and clean them
+        doc_tags_list = [tag.strip() for tag in doc_tags.split(',') if tag.strip()]
+        # Use the first few tags or join them as needed
+        tags.append(doc_tags_list[:5] if doc_tags_list else [])  # Limit to first 5 tags per doc
 
     index = faiss.IndexFlatL2(embeddings.shape[1])
     index.add(embeddings)
@@ -40,19 +47,25 @@ def save_index(index, docs, tags, filepath):
     """
     Saves the FAISS index and documents to a file.
     """
+    import os
     faiss.write_index(index, filepath)
-    with open('docs.pkl', 'wb') as f:
+    docs_path = os.path.splitext(filepath)[0] + '_docs.pkl'
+    tags_path = os.path.splitext(filepath)[0] + '_tags.pkl'
+    with open(docs_path, 'wb') as f:
         pickle.dump(docs, f)
-    with open('tags.pkl', 'wb') as f:
+    with open(tags_path, 'wb') as f:
         pickle.dump(tags, f)
 
 def load_index(filepath):
     """
     Loads a FAISS index and documents from a file.
     """
+    import os
     index = faiss.read_index(filepath)
-    with open('docs.pkl', 'rb') as f:
+    docs_path = os.path.splitext(filepath)[0] + '_docs.pkl'
+    tags_path = os.path.splitext(filepath)[0] + '_tags.pkl'
+    with open(docs_path, 'rb') as f:
         docs = pickle.load(f)
-    with open('tags.pkl', 'rb') as f:
+    with open(tags_path, 'rb') as f:
         tags = pickle.load(f)
     return index, docs, tags

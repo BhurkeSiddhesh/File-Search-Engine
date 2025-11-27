@@ -10,10 +10,17 @@ def search(query, index, docs, tags, embeddings_model):
 
     results = []
     for i, idx in enumerate(indices[0]):
-        results.append({
-            "document": docs[idx],
-            "distance": distances[0][i],
-            "tags": tags[idx] if idx < len(tags) else []
-        })
+        # Check if idx is a valid index and not -1 (which FAISS returns for empty indices)
+        if idx != -1 and idx < len(docs):
+            # Handle tags as either a string or a list
+            tag = tags[idx] if idx < len(tags) else []
+            # If tag is a list, join it; otherwise use as-is
+            if isinstance(tag, list):
+                tag = ', '.join(tag)
+            results.append({
+                "document": docs[idx],
+                "distance": distances[0][i],
+                "tags": tag
+            })
 
     return results
