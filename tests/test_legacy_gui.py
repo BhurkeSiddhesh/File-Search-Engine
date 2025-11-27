@@ -4,7 +4,7 @@ import os
 from unittest.mock import patch, MagicMock
 import sys
 from io import StringIO
-from main import load_config, save_config, create_main_window, create_settings_window
+from legacy_gui import load_config, save_config, create_main_window, create_settings_window
 
 
 class TestMain(unittest.TestCase):
@@ -15,7 +15,7 @@ class TestMain(unittest.TestCase):
         self.temp_dir = tempfile.mkdtemp()
         self.config_path = os.path.join(self.temp_dir, "config.ini")
     
-    @patch('main.configparser.ConfigParser.read')
+    @patch('legacy_gui.configparser.ConfigParser.read')
     def test_load_config(self, mock_read):
         """Test loading configuration."""
         mock_read.return_value = None
@@ -40,7 +40,7 @@ class TestMain(unittest.TestCase):
         config_path = os.path.join(self.temp_dir, "test_config.ini")
         
         # Patch the open function to write to our temp file
-        with patch('main.open', create=True) as mock_open:
+        with patch('legacy_gui.open', create=True) as mock_open:
             # Mock the file object returned by open
             mock_file = MagicMock()
             mock_open.return_value.__enter__.return_value = mock_file
@@ -49,7 +49,7 @@ class TestMain(unittest.TestCase):
         # Verify that open was called
         mock_open.assert_called_once()
     
-    @patch('main.sg')
+    @patch('legacy_gui.sg')
     def test_create_main_window(self, mock_sg):
         """Test creation of main window."""
         # Mock the PySimpleGUI elements
@@ -65,9 +65,9 @@ class TestMain(unittest.TestCase):
         mock_sg.Window.assert_called_once()
         self.assertEqual(window, mock_window)
     
-    @patch('main.configparser.ConfigParser.get')
-    @patch('main.configparser.ConfigParser.getboolean')
-    @patch('main.sg')
+    @patch('legacy_gui.configparser.ConfigParser.get')
+    @patch('legacy_gui.configparser.ConfigParser.getboolean')
+    @patch('legacy_gui.sg')
     def test_create_settings_window(self, mock_sg, mock_getboolean, mock_get):
         """Test creation of settings window."""
         # Mock configuration values

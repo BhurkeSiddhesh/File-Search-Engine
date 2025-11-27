@@ -11,3 +11,6 @@ tiktoken
 watchdog
 langchain-text-splitters
 langchain-community
+fastapi
+uvicorn
+python-multipart

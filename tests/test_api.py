@@ -3,7 +3,6 @@ from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from api import app
 
-
 class TestAPI(unittest.TestCase):
     """Test cases for API module"""
 
@@ -11,61 +10,95 @@ class TestAPI(unittest.TestCase):
         """Set up test client before each test method."""
         self.client = TestClient(app)
     
-    @patch('api.load_index')
-    @patch('api.create_index')
-    @patch('api.save_index')
-    @patch('api.search')
-    @patch('api.extract_text')
-    def test_search_files_endpoint(self, mock_extract_text, mock_search, 
-                                   mock_create_index, mock_load_index, mock_save_index):
-        """Test the search endpoint."""
-        # Mock the index loading to fail (to trigger index creation)
-        mock_load_index.side_effect = Exception("Index not found")
+    @patch('api.load_config')
+    def test_get_config(self, mock_load_config):
+        """Test getting configuration."""
+        mock_config = MagicMock()
+        mock_config.get.side_effect = lambda section, key, fallback='': {
+            ('General', 'folder'): '/test/folder',
+            ('APIKeys', 'openai_api_key'): 'sk-test',
+            ('LocalLLM', 'model_path'): '/models/gpt.gguf',
+            ('LocalLLM', 'provider'): 'local'
+        }.get((section, key), fallback)
         
-        # Mock index creation
-        mock_created_index = MagicMock()
-        mock_create_index.return_value = mock_created_index
+        mock_config.getboolean.side_effect = lambda section, key, fallback=False: {
+            ('General', 'auto_index'): True
+        }.get((section, key), fallback)
         
-        # Mock search results
-        mock_search.return_value = [("file1.txt", "snippet1"), ("file2.txt", "snippet2")]
+        mock_load_config.return_value = mock_config
         
-        # Mock text extraction
-        mock_extract_text.return_value = "Sample text content"
+        response = self.client.get("/api/config")
         
-        # Make a request to the search endpoint
-        response = self.client.post("/api/search", json={
-            "query": "test query",
-            "folder_path": "/test/folder",
-            "use_llm": False
-        })
-        
-        # Verify the response
         self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.json(), list)
-    
-    @patch('api.create_index')
-    @patch('api.save_index')
-    def test_index_folder_endpoint(self, mock_save_index, mock_create_index):
-        """Test the index endpoint."""
-        # Mock index creation and saving
-        mock_index = MagicMock()
-        mock_create_index.return_value = mock_index
-        
-        # Make a request to the index endpoint
-        response = self.client.post("/api/index", params={
-            "folder_path": "/test/folder"
-        })
-        
-        # Verify the response
-        self.assertEqual(response.status_code, 200)
-        response_data = response.json()
-        self.assertEqual(response_data["status"], "success")
-        self.assertIn("Folder indexed successfully", response_data["message"])
-        
-        # Verify that create_index and save_index were called
-        mock_create_index.assert_called_once_with("/test/folder")
-        mock_save_index.assert_called_once_with(mock_index, "/test/folder")
+        data = response.json()
+        self.assertEqual(data['folder'], '/test/folder')
+        self.assertEqual(data['auto_index'], True)
+        self.assertEqual(data['provider'], 'local')
 
+    @patch('api.save_config_file')
+    def test_update_config(self, mock_save_config):
+        """Test updating configuration."""
+        response = self.client.post("/api/config", json={
+            "folder": "/new/folder",
+            "auto_index": False,
+            "openai_api_key": "sk-new",
+            "model_path": "",
+            "provider": "openai"
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'success')
+        mock_save_config.assert_called_once()
+
+    @patch('api.load_config')
+    @patch('api.search')
+    @patch('api.summarize')
+    @patch('api.get_embeddings')
+    def test_search_endpoint(self, mock_get_embeddings, mock_summarize, mock_search, mock_load_config):
+        """Test the search endpoint."""
+        # Mock config
+        mock_config = MagicMock()
+        mock_config.get.return_value = 'openai'
+        mock_load_config.return_value = mock_config
+        
+        # Mock index presence (global in api.py)
+        with patch('api.index', MagicMock()), \
+             patch('api.docs', []), \
+             patch('api.tags', []):
+            
+            # Mock search results
+            mock_search.return_value = [{
+                'document': 'content',
+                'tags': ['tag1']
+            }]
+            
+            # Mock summary
+            mock_summarize.return_value = "Summary"
+            
+            response = self.client.post("/api/search", json={
+                "query": "test query"
+            })
+            
+            self.assertEqual(response.status_code, 200)
+            data = response.json()
+            self.assertIsInstance(data, list)
+            self.assertEqual(len(data), 1)
+            self.assertEqual(data[0]['summary'], "Summary")
+
+    @patch('api.load_config')
+    @patch('api.BackgroundTasks.add_task')
+    def test_index_endpoint(self, mock_add_task, mock_load_config):
+        """Test the index endpoint."""
+        mock_config = MagicMock()
+        mock_config.get.return_value = '/test/folder'
+        mock_load_config.return_value = mock_config
+        
+        with patch('os.path.exists', return_value=True):
+            response = self.client.post("/api/index")
+            
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()['status'], 'accepted')
+            mock_add_task.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()
