@@ -5,10 +5,15 @@ from typing import List, Optional
 import uvicorn
 import os
 import configparser
+import tkinter as tk
+from tkinter import filedialog
 from indexing import create_index, save_index, load_index
 from search import search
-from llm_integration import summarize, get_embeddings
+from llm_integration import summarize, get_embeddings, generate_ai_answer
 from file_processing import extract_text
+from model_manager import get_available_models, get_local_models, start_download, get_download_status
+import database
+import time
 
 app = FastAPI()
 
@@ -27,6 +32,14 @@ docs = []
 tags = []
 
 def load_config():
+    if not os.path.exists('config.ini'):
+        config = configparser.ConfigParser()
+        config['General'] = {'folder': '', 'auto_index': 'False'}
+        config['APIKeys'] = {'openai_api_key': ''}
+        config['LocalLLM'] = {'model_path': '', 'provider': 'openai'}
+        with open('config.ini', 'w') as configfile:
+            config.write(configfile)
+    
     config = configparser.ConfigParser()
     config.read('config.ini')
     return config
@@ -44,7 +57,65 @@ async def startup_event():
             index, docs, tags = load_index('index.faiss')
             print("Loaded existing index.")
         except Exception as e:
-            print(f"Failed to load index: {e}")
+            print(f"Error loading index: {e}")
+            index = None
+            docs = []
+            tags = []
+
+@app.get("/api/browse")
+async def browse_folder():
+    """Open a folder browser dialog and return the selected path."""
+    try:
+        # Create a hidden root window
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)  # Bring dialog to front
+        
+        folder_path = filedialog.askdirectory(title="Select Folder to Index")
+        root.destroy()
+        
+        if folder_path:
+            return {"folder": folder_path}
+        else:
+            return {"folder": None}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to open folder dialog: {str(e)}")
+
+@app.get("/api/models/available")
+async def list_available_models():
+    return get_available_models()
+
+@app.get("/api/models/local")
+async def list_local_models():
+    return get_local_models()
+
+@app.post("/api/models/download/{model_id}")
+async def download_model_endpoint(model_id: str):
+    success, message = start_download(model_id)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    return {"status": "success", "message": message}
+
+@app.get("/api/models/status")
+async def download_status_endpoint():
+    return get_download_status()
+
+@app.delete("/api/models/delete")
+async def delete_model(request: dict):
+    """Delete a downloaded model file."""
+    model_path = request.get('path', '')
+    if not model_path:
+        raise HTTPException(status_code=400, detail="Model path required")
+    
+    try:
+        if os.path.exists(model_path):
+            os.remove(model_path)
+            return {"status": "success", "message": "Model deleted"}
+        else:
+            raise HTTPException(status_code=404, detail="Model file not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 class SearchRequest(BaseModel):
     query: str
@@ -53,6 +124,14 @@ class SearchResult(BaseModel):
     document: str
     summary: Optional[str] = None
     tags: List[str] = []
+    file_path: Optional[str] = None
+    file_name: Optional[str] = None
+    faiss_idx: Optional[int] = None
+
+class SearchResponse(BaseModel):
+    results: List[SearchResult]
+    ai_answer: Optional[str] = ""
+    active_model: Optional[str] = ""
 
 class ConfigModel(BaseModel):
     folder: str
@@ -81,7 +160,7 @@ async def update_config(config_data: ConfigModel):
     save_config_file(config)
     return {"status": "success", "message": "Configuration saved"}
 
-@app.post("/api/search", response_model=List[SearchResult])
+@app.post("/api/search", response_model=SearchResponse)
 async def search_files(request: SearchRequest):
     global index, docs, tags
     
@@ -89,6 +168,8 @@ async def search_files(request: SearchRequest):
         raise HTTPException(status_code=400, detail="Index not loaded. Please configure and index a folder first.")
 
     try:
+        start_time = time.time()
+        
         config = load_config()
         provider = config.get('LocalLLM', 'provider', fallback='openai')
         api_key = config.get('APIKeys', 'openai_api_key', fallback=None)
@@ -99,19 +180,148 @@ async def search_files(request: SearchRequest):
         # Search
         results = search(request.query, index, docs, tags, embeddings_model)
         
-        # Process results with summaries
+        # Process results with summaries and file info
         processed_results = []
+        context_snippets = []
+        
         for result in results:
-            summary = summarize(result['document'], provider, api_key, model_path)
+            # Pass the query to extract relevant answers from the document
+            summary = summarize(result['document'], provider, api_key, model_path, question=request.query)
+            
+            # Format context for AI
+            if summary:
+                context_snippets.append(summary)
+            else:
+                context_snippets.append(result['document'][:500])
+
+            # Convert tags from string to list if needed
+            result_tags = result.get('tags', '')
+            if isinstance(result_tags, str):
+                result_tags = [t.strip() for t in result_tags.split(',') if t.strip()]
+            
+            # Get file info from FAISS index
+            faiss_idx = result.get('faiss_idx')
+            file_info = database.get_file_by_faiss_index(faiss_idx) if faiss_idx is not None else None
+            
             processed_results.append(SearchResult(
                 document=result['document'],
                 summary=summary,
-                tags=result['tags']
+                tags=result_tags,
+                faiss_idx=faiss_idx,
+                file_path=file_info['path'] if file_info else None,
+                file_name=file_info['filename'] if file_info else None
             ))
+        
+        # Generate AI Answer if we have local model
+        ai_answer = ""
+        active_model_name = "Embedded Search"
+        
+        if model_path and os.path.exists(model_path):
+            active_model_name = os.path.basename(model_path).replace(".gguf", "").replace("-", " ")
+            context_text = "\n\n".join(context_snippets[:4]) # Top 4 results
+            if context_text:
+                print(f"Generating answer with {active_model_name}...")
+                ai_answer = generate_ai_answer(context_text, request.query, model_path)
+        
+        # Save to search history
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        database.add_search_history(request.query, len(processed_results), execution_time_ms)
             
-        return processed_results
+        return SearchResponse(
+            results=processed_results,
+            ai_answer=ai_answer,
+            active_model=active_model_name
+        )
+    except Exception as e:
+        print(f"Search error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/search/history")
+async def get_search_history():
+    """Get recent search history."""
+    try:
+        history = database.get_search_history(limit=50)
+        return history
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/search/history/{history_id}")
+async def delete_search_history_item(history_id: int):
+    """Delete a single search history item."""
+    try:
+        success = database.delete_search_history_item(history_id)
+        if success:
+            return {"status": "success", "message": "History item deleted"}
+        raise HTTPException(status_code=404, detail="History item not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/search/history")
+async def delete_all_search_history():
+    """Delete all search history."""
+    try:
+        count = database.delete_all_search_history()
+        return {"status": "success", "message": f"Deleted {count} history items"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/open-file")
+async def open_file(request: dict):
+    """Open a file in the default system application."""
+    file_path = request.get('path', '')
+    if not file_path:
+        raise HTTPException(status_code=400, detail="File path is required")
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    try:
+        import subprocess
+        import platform
+        
+        if platform.system() == 'Windows':
+            os.startfile(file_path)
+        elif platform.system() == 'Darwin':  # macOS
+            subprocess.run(['open', file_path])
+        else:  # Linux
+            subprocess.run(['xdg-open', file_path])
+        
+        return {"status": "success", "message": f"Opened {os.path.basename(file_path)}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to open file: {str(e)}")
+
+@app.get("/api/files")
+async def list_indexed_files():
+    """Get all indexed files with metadata."""
+    try:
+        files = database.get_all_files()
+        return files
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/validate-path")
+async def validate_path(request: dict):
+    """Validate a folder path and count indexable files."""
+    path = request.get('path', '')
+    if not path:
+        return {"valid": False, "error": "Path is required"}
+    
+    if not os.path.exists(path):
+        return {"valid": False, "error": "Path does not exist"}
+    
+    if not os.path.isdir(path):
+        return {"valid": False, "error": "Path is not a directory"}
+    
+    # Count supported files
+    supported_extensions = {'.txt', '.pdf', '.docx', '.xlsx', '.pptx'}
+    file_count = 0
+    for dirpath, _, filenames in os.walk(path):
+        for filename in filenames:
+            ext = os.path.splitext(filename)[1].lower()
+            if ext in supported_extensions:
+                file_count += 1
+    
+    return {"valid": True, "file_count": file_count}
 
 @app.post("/api/index")
 async def trigger_indexing(background_tasks: BackgroundTasks):

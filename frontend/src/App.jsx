@@ -2,72 +2,193 @@ import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import SearchBar from './components/SearchBar';
 import SearchResults from './components/SearchResults';
+import SearchHistory from './components/SearchHistory';
 import SettingsModal from './components/SettingsModal';
 import axios from 'axios';
+import { History, Sparkles } from 'lucide-react';
 
 function App() {
-    const [darkMode, setDarkMode] = useState(false);
+    const [darkMode, setDarkMode] = useState(true);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [searchResults, setSearchResults] = useState([]);
+    const [aiAnswer, setAiAnswer] = useState("");
+    const [activeModel, setActiveModel] = useState(null);
+    const [availableModels, setAvailableModels] = useState([]); // [NEW]
     const [isLoading, setIsLoading] = useState(false);
+    const [hasSearched, setHasSearched] = useState(false);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
     useEffect(() => {
-        // Check system preference
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    useEffect(() => {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            setDarkMode(savedTheme === 'dark');
+        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
             setDarkMode(true);
         }
+        checkConfig();
+        fetchModels(); // [NEW]
     }, []);
+
+    const fetchModels = async () => {
+        try {
+            const res = await axios.get('/api/models/local');
+            if (Array.isArray(res.data)) {
+                setAvailableModels(res.data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch local models", error);
+        }
+    };
+
+    const checkConfig = async () => {
+        try {
+            const res = await axios.get('/api/config');
+            if (res.data.local_model_path) {
+                const modelName = res.data.local_model_path.split('\\').pop().split('/').pop().replace('.gguf', '');
+                setActiveModel(modelName);
+            } else {
+                setActiveModel("Default Embeddings");
+            }
+        } catch (error) {
+            console.error("Failed to check config", error);
+        }
+    };
+
+    const handleModelChange = async (modelName) => {
+        // Find the full path from availableModels
+        const selectedModel = availableModels.find(m => m.name.replace('.gguf', '') === modelName || m.name === modelName);
+        const modelPath = selectedModel ? selectedModel.path : "";
+
+        try {
+            // We need to preserve other config, so first get it (activeModel state isn't enough context)
+            const currentConfig = await axios.get('/api/config');
+
+            await axios.post('/api/config', {
+                folder: currentConfig.data.folder,
+                auto_index: currentConfig.data.auto_index,
+                openai_api_key: currentConfig.data.openai_api_key,
+                provider: 'local',
+                local_model_path: modelPath
+            });
+            setActiveModel(modelName);
+            // Optionally notify user
+        } catch (error) {
+            console.error("Failed to switch model", error);
+        }
+    };
 
     useEffect(() => {
         if (darkMode) {
             document.documentElement.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
         } else {
             document.documentElement.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
         }
     }, [darkMode]);
 
     const handleSearch = async (query) => {
         setIsLoading(true);
+        setHasSearched(true);
+        setIsHistoryOpen(false);
+        setAiAnswer(""); // Reset previous answer
+        setSearchResults([]); // Clear previous results
         try {
             const response = await axios.post('http://localhost:8000/api/search', { query });
-            setSearchResults(response.data);
+            setSearchResults(response.data.results || response.data);
+            if (response.data.ai_answer) {
+                setAiAnswer(response.data.ai_answer);
+            }
+            if (response.data.active_model) {
+                setActiveModel(response.data.active_model);
+            }
         } catch (error) {
             console.error('Search failed:', error);
-            alert('Search failed. Please check if the backend is running and the index is loaded.');
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-[#1d1d1f] transition-colors duration-300">
+        <div className="min-h-screen bg-background text-foreground selection:bg-primary/20 transition-colors duration-500 relative">
+            {/* 3D Background Image Layer */}
+            <div className="fixed inset-0 z-[-2] bg-cover bg-center bg-no-repeat opacity-20 dark:opacity-10 transition-opacity duration-1000"
+                style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2672&auto=format&fit=crop")' }}>
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-[2px]" />
+            </div>
+
+            {/* 3D Floating Elements */}
+            <div className="fixed inset-0 overflow-hidden -z-10 pointer-events-none">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] animate-float" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px] animate-float" style={{ animationDelay: '-2s' }} />
+            </div>
+
             <Header
                 darkMode={darkMode}
                 toggleDarkMode={() => setDarkMode(!darkMode)}
                 openSettings={() => setIsSettingsOpen(true)}
+                activeModel={activeModel}
+                availableModels={availableModels} // [NEW]
+                onModelChange={handleModelChange} // [NEW]
             />
 
-            <main className="container mx-auto pb-20">
-                <div className="flex flex-col items-center justify-center pt-20 pb-10 px-4">
-                    <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4 text-center tracking-tight">
-                        Find anything, instantly.
-                    </h2>
-                    <p className="text-gray-500 dark:text-gray-400 text-lg text-center max-w-2xl">
-                        Search through your documents with the power of AI.
-                    </p>
+            {/* 3D Floating History Button */}
+            <button
+                onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+                className={`fixed left-4 top-20 z-20 p-3 rounded-2xl glass-v2 transition-all duration-300 transform border border-white/20 hover:scale-110 active:scale-95 shadow-2xl ${isHistoryOpen ? 'rotate-12 translate-x-1' : ''}`}
+                title="Search History"
+            >
+                <History className="w-5 h-5 text-primary" />
+            </button>
+
+            <SearchHistory
+                isOpen={isHistoryOpen}
+                onClose={() => setIsHistoryOpen(false)}
+                onSelectQuery={handleSearch}
+                isMobile={isMobile}
+            />
+
+            <main className={`container mx-auto pb-16 min-h-[calc(100vh-3.5rem)] flex flex-col transition-all duration-500 ease-in-out ${isHistoryOpen && !isMobile ? 'pl-72' : ''}`}>
+                <div className={`flex-1 flex flex-col items-center w-full max-w-5xl mx-auto px-4 ${hasSearched ? 'pt-8' : 'justify-center'}`}>
+
+                    {/* 3D Hero Section */}
+                    {!hasSearched && (
+                        <div className="text-center space-y-8 animate-slide-up mb-12">
+                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl glass-v2 mb-4 animate-float">
+                                <Sparkles className="w-4 h-4 text-primary" />
+                                <span className="text-sm font-semibold tracking-wide uppercase">Hyper-Search Engine</span>
+                            </div>
+
+                            <h1 className="text-3d text-5xl md:text-7xl lg:text-8xl tracking-tighter leading-[0.9] py-4 bg-clip-text">
+                                EXPLORE<br />
+                                YOUR DATA
+                            </h1>
+
+                            <p className="text-muted-foreground text-lg md:text-xl max-w-2xl mx-auto font-medium opacity-80">
+                                Navigate your local filesystem with 3D physical search technology and AI intelligence.
+                            </p>
+                        </div>
+                    )}
+
+                    <div className={`w-full transition-all duration-500 ${hasSearched ? '' : 'animate-float'}`} style={{ animationDelay: '0.5s' }}>
+                        <SearchBar onSearch={handleSearch} isLoading={isLoading} />
+                    </div>
+
+                    <SearchResults results={searchResults} aiAnswer={aiAnswer} />
                 </div>
-
-                <SearchBar onSearch={handleSearch} isLoading={isLoading} />
-
-                <SearchResults results={searchResults} />
             </main>
 
             <SettingsModal
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}
-                onSave={() => {
-                    // Optional: Reload config or clear results
-                }}
+                onSave={() => { checkConfig(); fetchModels(); }}
             />
         </div>
     );

@@ -19,8 +19,10 @@ def search(query, index, docs, tags, embeddings_model):
                 tag = ', '.join(tag)
             results.append({
                 "document": docs[idx],
-                "distance": distances[0][i],
-                "tags": tag
+                "distance": float(distances[0][i]),
+                "tags": tag,
+                "faiss_idx": int(idx)
             })
 
     return results
+

@@ -1,6 +1,9 @@
 # Change Log
 
-## [Unreleased]
+## [Unreleased] - 2025-11-28 18:30
+
+### Changed
+- Started UI overhaul and functionality fixes based on user feedback.
 
 ### Added
 - Created `CHANGELOG.md` to track changes.

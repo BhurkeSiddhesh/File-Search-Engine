@@ -3,6 +3,7 @@ import { Search, Loader2 } from 'lucide-react';
 
 const SearchBar = ({ onSearch, isLoading }) => {
     const [query, setQuery] = useState('');
+    const [isFocused, setIsFocused] = useState(false);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -12,25 +13,42 @@ const SearchBar = ({ onSearch, isLoading }) => {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto mt-8 px-4">
-            <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    {isLoading ? (
-                        <Loader2 className="h-5 w-5 text-gray-400 animate-spin" />
-                    ) : (
-                        <Search className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+        <div className="w-full max-w-2xl mx-auto px-4 perspective-[1000px]">
+            <form onSubmit={handleSubmit} className="transform-gpu transition-all duration-300">
+                <div
+                    className={`relative flex items-center glass-v2 rounded-2xl border transition-all duration-300 shadow-2xl ${isFocused
+                            ? 'border-primary ring-4 ring-primary/10 -translate-y-2 scale-[1.02] shadow-primary/20'
+                            : 'border-border'
+                        }`}
+                >
+                    <div className="pl-5 flex items-center text-primary/60">
+                        {isLoading ? (
+                            <Loader2 className="w-6 h-6 animate-spin" />
+                        ) : (
+                            <Search className="w-6 h-6" />
+                        )}
+                    </div>
+                    <input
+                        type="text"
+                        className="w-full bg-transparent py-4 pl-3 pr-4 text-lg font-medium placeholder:text-muted-foreground focus:outline-none"
+                        placeholder="What are you looking for?"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        onFocus={() => setIsFocused(true)}
+                        onBlur={() => setIsFocused(false)}
+                        disabled={isLoading}
+                    />
+                    {query && (
+                        <button
+                            type="submit"
+                            className="mr-2.5 px-6 py-2 rounded-xl bg-primary text-primary-foreground font-bold shadow-lg hover:shadow-primary/40 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 uppercase tracking-tighter"
+                        >
+                            Search
+                        </button>
                     )}
                 </div>
-                <input
-                    type="text"
-                    className="block w-full pl-11 pr-4 py-4 bg-white dark:bg-gray-800 border-none rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none text-lg text-gray-900 dark:text-white placeholder-gray-400 transition-shadow"
-                    placeholder="Search your documents..."
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    disabled={isLoading}
-                />
-            </div>
-        </form>
+            </form>
+        </div>
     );
 };
 

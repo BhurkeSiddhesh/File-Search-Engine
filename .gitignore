@@ -28,11 +28,25 @@ node_modules/
 .env.local
 *.env.*
 
+# Models and Large Binaries
+models/
+*.gguf
+
+# Generated indices and databases
+*.faiss
+*.db
+index_docs.pkl
+index_tags.pkl
+docs.pkl
+tags.pkl
+
+# Configuration and Local Files
+config.ini
+stress_test_output.txt
+*_files.txt
+git_status*.txt
+
 # Editors
 .vscode/
 .idea/
-
-# System files
-.DS_Store
-Thumbs.db
 ```
