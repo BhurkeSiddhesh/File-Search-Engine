@@ -1,0 +1,29 @@
+{
+    "name": "file-search-engine",
+    "version": "1.0.0",
+    "description": "AI-Powered Local Document Search Engine",
+    "scripts": {
+        "install-all": "npm install && cd frontend && npm install",
+        "start": "node scripts/start_all.js",
+        "start:backend": "python -m uvicorn api:app --reload --host 0.0.0.0 --port 8000",
+        "start:frontend": "cd frontend && npm run dev",
+        "benchmark": "python benchmark_models.py --all",
+        "test": "python run_tests.py --quick",
+        "test:full": "python run_tests.py",
+        "test:stress": "python tests/stress_test.py"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2",
+        "wait-on": "^7.2.0"
+    },
+    "keywords": [
+        "search",
+        "ai",
+        "local",
+        "documents",
+        "faiss",
+        "llm"
+    ],
+    "author": "",
+    "license": "MIT"
+}

@@ -118,7 +118,7 @@ class TestIndexing(unittest.TestCase):
         # Verify the results
         self.assertEqual(loaded_index, mock_faiss_index)
         self.assertEqual(loaded_docs, ["Test document"])
-        self.assertEqual(loaded_tags, ["test", "tag"])
+        self.assertEqual(loaded_tags, [["test", "tag"]])
 
 
 if __name__ == '__main__':

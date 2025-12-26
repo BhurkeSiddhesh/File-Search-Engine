@@ -79,7 +79,8 @@ Question: {question}
 Answer:"""
 
     try:
-        output = llm(
+        # Use the new create_completion API for llama-cpp-python >= 0.3.x
+        output = llm.create_completion(
             prompt,
             max_tokens=256,
             stop=["System:", "Question:", "Context:"],
@@ -87,6 +88,20 @@ Answer:"""
             temperature=0.3
         )
         return output['choices'][0]['text'].strip()
+    except AttributeError:
+        # Fallback for older versions - try direct call
+        try:
+            output = llm(
+                prompt,
+                max_tokens=256,
+                stop=["System:", "Question:", "Context:"],
+                echo=False,
+                temperature=0.3
+            )
+            return output['choices'][0]['text'].strip()
+        except Exception as e:
+            print(f"Fallback generation error: {e}")
+            return None
     except Exception as e:
         print(f"Generation error: {e}")
         return None

@@ -116,6 +116,79 @@ async def delete_model(request: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Benchmark state
+benchmark_status = {
+    "running": False,
+    "progress": 0,
+    "current_model": None,
+    "error": None
+}
+benchmark_results = None
+
+def run_benchmark_task():
+    """Background task to run benchmarks."""
+    global benchmark_status, benchmark_results
+    import json
+    
+    try:
+        benchmark_status["running"] = True
+        benchmark_status["progress"] = 0
+        benchmark_status["error"] = None
+        
+        # Import and run benchmarks
+        from benchmark_models import run_all_benchmarks, save_results
+        
+        results = run_all_benchmarks(verbose=False)
+        if results:
+            save_results(results)
+            benchmark_results = {
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "results": [r.to_dict() for r in results]
+            }
+        
+        benchmark_status["running"] = False
+        benchmark_status["progress"] = 100
+        
+    except Exception as e:
+        benchmark_status["running"] = False
+        benchmark_status["error"] = str(e)
+
+@app.post("/api/benchmarks/run")
+async def run_benchmarks(background_tasks: BackgroundTasks):
+    """Start benchmark suite in background."""
+    global benchmark_status
+    
+    if benchmark_status["running"]:
+        raise HTTPException(status_code=400, detail="Benchmark already running")
+    
+    background_tasks.add_task(run_benchmark_task)
+    return {"status": "started", "message": "Benchmark started in background"}
+
+@app.get("/api/benchmarks/status")
+async def get_benchmark_status():
+    """Get current benchmark status."""
+    return benchmark_status
+
+@app.get("/api/benchmarks/results")
+async def get_benchmark_results():
+    """Get latest benchmark results."""
+    global benchmark_results
+    
+    # Try to load from file if not in memory
+    if benchmark_results is None:
+        results_file = "benchmark_results.json"
+        if os.path.exists(results_file):
+            import json
+            with open(results_file, 'r') as f:
+                benchmark_results = json.load(f)
+    
+    if benchmark_results is None:
+        return {"results": [], "message": "No benchmark results available. Run a benchmark first."}
+    
+    return benchmark_results
+
+
+
 
 class SearchRequest(BaseModel):
     query: str

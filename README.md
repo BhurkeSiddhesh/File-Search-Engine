@@ -74,32 +74,97 @@ User searches → Generate query embedding → Find similar documents → Return
 git clone https://github.com/yourusername/File-Search-Engine
 cd File-Search-Engine-1
 
-# Install Python dependencies
+# Install all dependencies (backend + frontend + tools)
+npm run install-all
+
+# Or manually:
 pip install -r requirements.txt
-
-# Install frontend dependencies
-cd frontend
-npm install
-cd ..
+cd frontend && npm install && cd ..
 ```
 
-### 2. Start Backend
+### 2. Start the Application (Single Command!)
 
 ```bash
+npm run start
+```
+
+This will:
+- ✅ Check port availability (8000, 5173)
+- ✅ Start the FastAPI backend
+- ✅ Start the Vite frontend
+- ✅ Open your browser automatically
+
+**Alternative (Manual Start):**
+```bash
+# Terminal 1: Backend
 uvicorn api:app --reload
+
+# Terminal 2: Frontend
+cd frontend && npm run dev
 ```
 
-Backend API: `http://localhost:8000`
+**Available Scripts:**
+| Command | Description |
+|---------|-------------|
+| `npm run start` | Start backend + frontend together |
+| `npm run benchmark` | Run model performance benchmarks |
+| `npm run test` | Run all unit tests |
 
-### 3. Start Frontend
+## 🧪 Testing
+
+All tests are located in the `tests/` directory. Run tests before making changes to ensure stability.
+
+### Running Tests
 
 ```bash
-cd frontend
-npm run dev
+# Run all unit tests (quick - ~12 seconds)
+python run_tests.py --quick
+
+# Run all tests including model comparison (slow - ~5-10 minutes)
+python run_tests.py
+
+# Run with verbose output
+python run_tests.py --verbose
+
+# Run with coverage report (requires pytest-cov)
+python run_tests.py --coverage
+
+# Run a specific test file
+python -m pytest tests/test_api.py -v
+
+# Run stress tests only
+python tests/stress_test.py
 ```
 
-Frontend UI: `http://localhost:5173`
+### Test Files
 
+| Test File | Description |
+|-----------|-------------|
+| `test_api.py` | API endpoint tests (config, search, index) |
+| `test_database.py` | Database operations (file metadata, search history) |
+| `test_file_processing.py` | File extraction (PDF, DOCX, TXT, XLSX, PPTX) |
+| `test_indexing.py` | FAISS index creation and loading |
+| `test_search.py` | Semantic search functionality |
+| `test_llm_integration.py` | LLM and embeddings integration |
+| `test_model_comparison.py` | Model ranking and comparison tests |
+| `test_model_manager.py` | Model download and resource checks |
+| `test_benchmarks.py` | Benchmark module tests |
+| `test_workflow.py` | End-to-end workflow tests |
+| `test_rag_pipeline.py` | RAG pipeline integration tests |
+| `test_extraction.py` | Text extraction tests |
+| `stress_test.py` | Load and performance stress tests |
+
+### Before Committing
+
+Always run tests before committing changes:
+
+```bash
+# Quick validation
+python run_tests.py --quick
+
+# Full validation (if changing models or benchmarks)
+python run_tests.py
+```
 ## 💡 Usage Guide
 
 ### First-Time Setup
@@ -178,10 +243,50 @@ If you prefer cloud-based embeddings:
 - `GET /api/search/history` - Recent search history
 
 ### Models
-- `GET /api/models/available` - Downloadable models list
+- `GET /api/models/available` - Downloadable models list (with RAM requirements)
 - `GET /api/models/local` - Downloaded models
-- `POST /api/models/download/{model_id}` - Start download
+- `POST /api/models/download/{model_id}` - Start download (with resource validation)
 - `GET /api/models/status` - Download progress
+
+### Benchmarks
+- `POST /api/benchmarks/run` - Start performance benchmark suite
+- `GET /api/benchmarks/status` - Check benchmark progress
+- `GET /api/benchmarks/results` - Get latest benchmark results
+
+## 📊 Model Selection Guide
+
+| Model | Size | RAM | Speed | Quality | Best For |
+|-------|------|-----|-------|---------|----------|
+| **TinyLlama 1.1B** ⭐ | 637 MB | 2 GB | ⚡⚡⚡ | ⭐⭐ | Testing, older hardware |
+| **Gemma 2B** ⭐ | 1.5 GB | 4 GB | ⚡⚡⚡ | ⭐⭐⭐ | Fast summarization |
+| **Phi-2 2.7B** ⭐ | 1.7 GB | 5 GB | ⚡⚡ | ⭐⭐⭐ | Reasoning, code |
+| **Phi-3 Mini** ⭐ | 2.2 GB | 6 GB | ⚡⚡ | ⭐⭐⭐⭐ | General purpose |
+| **Mistral 7B** ⭐ | 4.4 GB | 8 GB | ⚡ | ⭐⭐⭐⭐⭐ | Best quality |
+| **Llama 2 7B** | 4.1 GB | 8 GB | ⚡ | ⭐⭐⭐⭐ | Chat, general |
+| **Qwen 1.5 7B** | 4.4 GB | 8 GB | ⚡ | ⭐⭐⭐⭐ | Multilingual |
+
+⭐ = Recommended models
+
+### Running Benchmarks
+
+Compare model performance with the built-in benchmark suite:
+
+```bash
+# Run from command line
+npm run benchmark
+
+# Or via API
+curl -X POST http://localhost:8000/api/benchmarks/run
+```
+
+Benchmarks measure:
+- **Tokens per second (TPS)** - Generation speed
+- **Fact retention** - Accuracy of summaries
+- **Memory usage** - RAM consumption
+- **Load time** - Model startup time
+
+Results are saved to `benchmark_results.md` and viewable in the Settings panel.
+
 
 ## 🧪 Testing
 

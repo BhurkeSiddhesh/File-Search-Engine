@@ -5,7 +5,7 @@ python-pptx
 openpyxl
 openai
 langchain
-llama-cpp-python
+llama-cpp-python==0.2.90
 faiss-cpu
 tiktoken
 watchdog

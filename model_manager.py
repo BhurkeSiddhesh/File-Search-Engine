@@ -1,32 +1,174 @@
 import os
 import requests
 import threading
+import shutil
+import psutil
 
 MODELS_DIR = "models"
 os.makedirs(MODELS_DIR, exist_ok=True)
 
-# Curated list of GGUF models
+# Expanded list of GGUF models with metadata
 AVAILABLE_MODELS = [
+    # Small Models (< 2GB) - Good for testing and low-resource systems
     {
         "id": "tinyllama-1.1b-chat-v1.0.Q4_K_M",
         "name": "TinyLlama 1.1B Chat",
         "description": "Fast and lightweight, great for older hardware.",
         "size": "637 MB",
+        "size_bytes": 668000000,
+        "ram_required": 2,
+        "category": "small",
+        "quantization": "Q4_K_M",
+        "use_case": "Quick responses, testing",
+        "recommended": True,
         "url": "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
     },
     {
+        "id": "stablelm-2-zephyr-1_6b.Q4_K_M",
+        "name": "StableLM 2 Zephyr 1.6B",
+        "description": "Stability AI's efficient small model.",
+        "size": "986 MB",
+        "size_bytes": 1034000000,
+        "ram_required": 3,
+        "category": "small",
+        "quantization": "Q4_K_M",
+        "use_case": "Chat, general tasks",
+        "recommended": False,
+        "url": "https://huggingface.co/TheBloke/stablelm-2-zephyr-1_6b-GGUF/resolve/main/stablelm-2-zephyr-1_6b.Q4_K_M.gguf"
+    },
+    {
+        "id": "gemma-2b-it.Q4_K_M",
+        "name": "Gemma 2B Instruct (Google)",
+        "description": "Google's efficient instruction-tuned model.",
+        "size": "1.5 GB",
+        "size_bytes": 1600000000,
+        "ram_required": 4,
+        "category": "small",
+        "quantization": "Q4_K_M",
+        "use_case": "Instructions, summarization",
+        "recommended": True,
+        "url": "https://huggingface.co/lmstudio-ai/gemma-2b-it-GGUF/resolve/main/gemma-2b-it-q4_k_m.gguf"
+    },
+    
+    # Medium Models (2-4GB) - Balanced performance
+    {
         "id": "phi-2.Q4_K_M",
-        "name": "Phi-2 (Microsoft)",
-        "description": "Microsoft's powerful small model (2.7B).",
+        "name": "Phi-2 2.7B (Microsoft)",
+        "description": "Microsoft's powerful small model with excellent reasoning.",
         "size": "1.7 GB",
+        "size_bytes": 1800000000,
+        "ram_required": 5,
+        "category": "medium",
+        "quantization": "Q4_K_M",
+        "use_case": "Reasoning, code, math",
+        "recommended": True,
         "url": "https://huggingface.co/TheBloke/phi-2-GGUF/resolve/main/phi-2.Q4_K_M.gguf"
     },
     {
-        "id": "mistral-7b-instruct-v0.1.Q4_K_M",
-        "name": "Mistral 7B Instruct",
-        "description": "High performance 7B model.",
+        "id": "phi-3-mini-4k-instruct.Q4_K_M",
+        "name": "Phi-3 Mini 4K (Microsoft)",
+        "description": "Latest Microsoft small model with improved capabilities.",
+        "size": "2.2 GB",
+        "size_bytes": 2360000000,
+        "ram_required": 6,
+        "category": "medium",
+        "quantization": "Q4_K_M",
+        "use_case": "General, reasoning, code",
+        "recommended": True,
+        "url": "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf"
+    },
+    {
+        "id": "orca-mini-3b.Q4_K_M",
+        "name": "Orca Mini 3B",
+        "description": "Microsoft research model, good at following instructions.",
+        "size": "1.9 GB",
+        "size_bytes": 2040000000,
+        "ram_required": 5,
+        "category": "medium",
+        "quantization": "Q4_K_M",
+        "use_case": "Instructions, reasoning",
+        "recommended": False,
+        "url": "https://huggingface.co/TheBloke/orca_mini_3B-GGUF/resolve/main/orca_mini_3b.Q4_K_M.gguf"
+    },
+    {
+        "id": "rocket-3b.Q4_K_M",
+        "name": "Rocket 3B",
+        "description": "Fast 3B model optimized for chat.",
+        "size": "1.8 GB",
+        "size_bytes": 1930000000,
+        "ram_required": 5,
+        "category": "medium",
+        "quantization": "Q4_K_M",
+        "use_case": "Chat, fast responses",
+        "recommended": False,
+        "url": "https://huggingface.co/TheBloke/rocket-3B-GGUF/resolve/main/rocket-3b.Q4_K_M.gguf"
+    },
+    
+    # Large Models (4-8GB) - High quality, needs more RAM
+    {
+        "id": "mistral-7b-instruct-v0.2.Q4_K_M",
+        "name": "Mistral 7B Instruct v0.2",
+        "description": "Excellent 7B model with strong performance.",
         "size": "4.37 GB",
-        "url": "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf"
+        "size_bytes": 4690000000,
+        "ram_required": 8,
+        "category": "large",
+        "quantization": "Q4_K_M",
+        "use_case": "General, summarization, chat",
+        "recommended": True,
+        "url": "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
+    },
+    {
+        "id": "llama-2-7b-chat.Q4_K_M",
+        "name": "Llama 2 7B Chat (Meta)",
+        "description": "Meta's popular open-source chat model.",
+        "size": "4.08 GB",
+        "size_bytes": 4380000000,
+        "ram_required": 8,
+        "category": "large",
+        "quantization": "Q4_K_M",
+        "use_case": "Chat, general tasks",
+        "recommended": False,
+        "url": "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf"
+    },
+    {
+        "id": "qwen1.5-7b-chat.Q4_K_M",
+        "name": "Qwen 1.5 7B Chat (Alibaba)",
+        "description": "Alibaba's multilingual chat model.",
+        "size": "4.4 GB",
+        "size_bytes": 4720000000,
+        "ram_required": 8,
+        "category": "large",
+        "quantization": "Q4_K_M",
+        "use_case": "Multilingual, chat",
+        "recommended": False,
+        "url": "https://huggingface.co/Qwen/Qwen1.5-7B-Chat-GGUF/resolve/main/qwen1_5-7b-chat-q4_k_m.gguf"
+    },
+    {
+        "id": "zephyr-7b-beta.Q4_K_M",
+        "name": "Zephyr 7B Beta",
+        "description": "HuggingFace's helpful assistant model.",
+        "size": "4.37 GB",
+        "size_bytes": 4690000000,
+        "ram_required": 8,
+        "category": "large",
+        "quantization": "Q4_K_M",
+        "use_case": "Helpful assistant, chat",
+        "recommended": False,
+        "url": "https://huggingface.co/TheBloke/zephyr-7B-beta-GGUF/resolve/main/zephyr-7b-beta.Q4_K_M.gguf"
+    },
+    {
+        "id": "neural-chat-7b-v3-1.Q4_K_M",
+        "name": "Neural Chat 7B v3.1 (Intel)",
+        "description": "Intel's optimized chat model.",
+        "size": "4.37 GB",
+        "size_bytes": 4690000000,
+        "ram_required": 8,
+        "category": "large",
+        "quantization": "Q4_K_M",
+        "use_case": "Chat, instructions",
+        "recommended": False,
+        "url": "https://huggingface.co/TheBloke/neural-chat-7B-v3-1-GGUF/resolve/main/neural-chat-7b-v3-1.Q4_K_M.gguf"
     }
 ]
 
@@ -34,7 +176,9 @@ download_status = {
     "downloading": False,
     "model_id": None,
     "progress": 0,
-    "error": None
+    "error": None,
+    "bytes_downloaded": 0,
+    "total_bytes": 0
 }
 
 def get_available_models():
@@ -48,49 +192,116 @@ def get_local_models():
             if f.endswith(".gguf"):
                 filepath = os.path.join(MODELS_DIR, f)
                 size = os.path.getsize(filepath)
+                
+                # Try to find metadata from AVAILABLE_MODELS
+                model_id = f.replace(".gguf", "")
+                available_model = next((m for m in AVAILABLE_MODELS if m["id"] == model_id), None)
+                
                 models.append({
-                    "id": f.replace(".gguf", ""),
+                    "id": model_id,
                     "filename": f,
                     "path": os.path.abspath(filepath),
                     "size": size,
-                    "name": f.replace(".gguf", "").replace("-", " ").replace(".", " ")
+                    "name": available_model["name"] if available_model else f.replace(".gguf", "").replace("-", " ").replace(".", " "),
+                    "category": available_model["category"] if available_model else "unknown",
+                    "ram_required": available_model["ram_required"] if available_model else None
                 })
     return models
 
-def download_file(url, filename, model_id):
+def check_system_resources(model):
+    """Check if system has enough resources for the model."""
+    warnings = []
+    can_download = True
+    
+    # Check available disk space
+    disk_usage = shutil.disk_usage(MODELS_DIR)
+    available_gb = disk_usage.free / (1024**3)
+    required_gb = model.get("size_bytes", 0) / (1024**3) * 1.1  # 10% buffer
+    
+    if available_gb < required_gb:
+        warnings.append(f"Low disk space: {available_gb:.1f}GB available, {required_gb:.1f}GB needed")
+        can_download = False
+    
+    # Check available RAM
+    ram_info = psutil.virtual_memory()
+    available_ram_gb = ram_info.available / (1024**3)
+    required_ram_gb = model.get("ram_required", 4)
+    
+    if available_ram_gb < required_ram_gb:
+        warnings.append(f"Low RAM: {available_ram_gb:.1f}GB available, {required_ram_gb}GB recommended")
+        # Don't block download for RAM, just warn
+    
+    return can_download, warnings
+
+def download_file(url, filename, model_id, total_bytes=0):
     global download_status
     filepath = os.path.join(MODELS_DIR, filename)
+    temp_filepath = filepath + ".partial"
     
     try:
         print(f"Starting download: {url}")
-        download_status = {"downloading": True, "model_id": model_id, "progress": 0, "error": None}
+        download_status = {
+            "downloading": True, 
+            "model_id": model_id, 
+            "progress": 0, 
+            "error": None,
+            "bytes_downloaded": 0,
+            "total_bytes": total_bytes
+        }
         
-        response = requests.get(url, stream=True, timeout=30)
+        # Check for partial download (resume support)
+        headers = {}
+        downloaded = 0
+        if os.path.exists(temp_filepath):
+            downloaded = os.path.getsize(temp_filepath)
+            headers["Range"] = f"bytes={downloaded}-"
+            print(f"Resuming from byte {downloaded}")
+        
+        response = requests.get(url, stream=True, headers=headers, timeout=30)
         response.raise_for_status()
         
-        total_size = int(response.headers.get('content-length', 0))
-        block_size = 1024 * 1024  # 1MB
-        downloaded = 0
+        # Get total size from headers
+        if "content-range" in response.headers:
+            total_size = int(response.headers.get("content-range", "").split("/")[-1])
+        else:
+            total_size = int(response.headers.get('content-length', 0)) + downloaded
         
-        with open(filepath, 'wb') as file:
+        download_status["total_bytes"] = total_size
+        block_size = 1024 * 1024  # 1MB
+        
+        mode = 'ab' if downloaded > 0 else 'wb'
+        with open(temp_filepath, mode) as file:
             for data in response.iter_content(block_size):
                 downloaded += len(data)
                 file.write(data)
                 if total_size > 0:
                     download_status["progress"] = int((downloaded / total_size) * 100)
-                    
+                    download_status["bytes_downloaded"] = downloaded
+        
+        # Rename to final filename
+        os.rename(temp_filepath, filepath)
+        
         print(f"Download complete: {filename}")
-        download_status = {"downloading": False, "model_id": None, "progress": 100, "error": None}
+        download_status = {
+            "downloading": False, 
+            "model_id": None, 
+            "progress": 100, 
+            "error": None,
+            "bytes_downloaded": downloaded,
+            "total_bytes": total_size
+        }
         
     except Exception as e:
         print(f"Download failed: {e}")
-        download_status = {"downloading": False, "model_id": model_id, "progress": 0, "error": str(e)}
-        # Clean up partial download
-        if os.path.exists(filepath):
-            try:
-                os.remove(filepath)
-            except:
-                pass
+        download_status = {
+            "downloading": False, 
+            "model_id": model_id, 
+            "progress": 0, 
+            "error": str(e),
+            "bytes_downloaded": 0,
+            "total_bytes": 0
+        }
+        # Keep partial file for resume
 
 def start_download(model_id):
     global download_status
@@ -109,10 +320,20 @@ def start_download(model_id):
     if os.path.exists(filepath):
         return False, "Model already downloaded"
     
-    thread = threading.Thread(target=download_file, args=(model["url"], filename, model_id))
+    # Check system resources
+    can_download, warnings = check_system_resources(model)
+    if not can_download:
+        return False, f"Cannot download: {'; '.join(warnings)}"
+    
+    thread = threading.Thread(
+        target=download_file, 
+        args=(model["url"], filename, model_id, model.get("size_bytes", 0))
+    )
     thread.daemon = True
     thread.start()
-    return True, "Download started"
+    
+    warning_msg = f" (Warnings: {'; '.join(warnings)})" if warnings else ""
+    return True, f"Download started{warning_msg}"
 
 def get_download_status():
     return download_status

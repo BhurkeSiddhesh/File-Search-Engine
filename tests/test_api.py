@@ -81,9 +81,13 @@ class TestAPI(unittest.TestCase):
             
             self.assertEqual(response.status_code, 200)
             data = response.json()
-            self.assertIsInstance(data, list)
-            self.assertEqual(len(data), 1)
-            self.assertEqual(data[0]['summary'], "Summary")
+            # Response is a dict with results, ai_answer, active_model
+            self.assertIsInstance(data, dict)
+            self.assertIn('results', data)
+            self.assertIn('ai_answer', data)
+            self.assertIn('active_model', data)
+            self.assertEqual(len(data['results']), 1)
+            self.assertEqual(data['results'][0]['summary'], "Summary")
 
     @patch('api.load_config')
     @patch('api.BackgroundTasks.add_task')

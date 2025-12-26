@@ -44,8 +44,9 @@ class TestFileProcessing(unittest.TestCase):
         expected = "First paragraph\nSecond paragraph"
         self.assertEqual(result, expected)
     
+    @patch('builtins.open', new_callable=mock_open)
     @patch('file_processing.PdfReader')
-    def test_extract_text_pdf(self, mock_pdf_reader):
+    def test_extract_text_pdf(self, mock_pdf_reader, mock_file):
         """Test text extraction from .pdf files."""
         mock_page1 = type('Page', (), {})()
         mock_page1.extract_text = lambda: 'Text from page 1'
